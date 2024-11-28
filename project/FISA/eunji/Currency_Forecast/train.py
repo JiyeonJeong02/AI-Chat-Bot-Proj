@@ -3,19 +3,21 @@
 import numpy as np
 import tensorflow as tf
 import pandas as pd
+import matplotlib.pyplot as plt
+from tensorflow.keras import layers, models
 from tensorflow.keras.layers import Input, Dense, LSTM, Conv1D, Dropout, Bidirectional, Multiply, Permute, Flatten
+from tensorflow.keras.utils import get_custom_objects, register_keras_serializable, get_custom_objects
 from tensorflow.keras.models import Model
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from sklearn.model_selection import train_test_split
-import yfinance as yf
+# import yfinance as yf
 from datetime import datetime
 from tensorflow.keras.models import load_model
+# from dotenv import load_dotenv
+import os
 import pymysql
 from sqlalchemy import create_engine
 from dotenv import load_dotenv
-import os
-
-
 load_dotenv()
 
 # 데이터베이스 연결 정보
@@ -26,6 +28,8 @@ port = os.getenv('sql_port')
 database = 'team5'
 engine = create_engine(f"mysql+pymysql://{username}:{password}@{host}:{port}/{database}")
 
+
+@register_keras_serializable(package="Custom", name="attention_3d_block")
 # Attention 블록 정의
 def attention_3d_block(inputs):
     input_dim = int(inputs.shape[2])
@@ -33,16 +37,24 @@ def attention_3d_block(inputs):
     a_probs = Permute((1, 2), name='attention_vec')(a)
     return Multiply()([inputs, a_probs])
 
+# 사용자 정의 레이어 등록
+get_custom_objects().update({"attention_3d_block": attention_3d_block})
+
 # 모델 정의
+@register_keras_serializable(package="Custom", name="attention_model")
 def attention_model(input_dims, time_steps, lstm_units):
     inputs = Input(shape=(time_steps, input_dims))
     x = Conv1D(filters=64, kernel_size=1, activation='relu')(inputs)
     x = Dropout(0.1)(x)
+    # Bidirectional 및 LSTM 정의
     lstm_out = Dropout(0.3)(Bidirectional(LSTM(lstm_units, return_sequences=True))(x))
     lstm_out2 = Dropout(0.3)(Bidirectional(LSTM(lstm_units, return_sequences=True))(lstm_out))
     attention_mul = Flatten()(attention_3d_block(lstm_out2))
     output = Dense(1, activation='linear')(attention_mul)
     return Model(inputs=[inputs], outputs=output)
+
+# 사용자 정의 모델 등록
+get_custom_objects().update({"attention_model": attention_model})
 
 def load_data_from_sql():
     try:
@@ -56,17 +68,6 @@ def load_data_from_sql():
         print(f"데이터베이스에서 데이터를 불러오는 중 오류 발생: {str(e)}")
         return pd.DataFrame()
 
-# 환율 데이터 가져오기
-def get_historical_exchange_rates(base_currency, target_currencies, start_date, end_date):
-    exchange_data = {}
-    for currency in target_currencies: # target_currencies = ['USD', 'EUR', 'JPY', 'CNY', 'GBP']
-        symbol = f"{currency}{base_currency}=X"
-        try:
-            data = yf.Ticker(symbol).history(start=start_date, end=end_date)
-            exchange_data[currency] = data['Close']
-        except Exception as e:
-            print(f"Error fetching data for {currency}: {e}")
-    return pd.DataFrame(exchange_data)
 
 # 결측값 처리
 def fill_na_with_avg(df):
@@ -79,16 +80,16 @@ def r2_keras(y_true, y_pred):
     return 1 - SS_res / (SS_tot + tf.keras.backend.epsilon())
 
 # 학습 진행 상황 시각화 함수
-# def plot_training_history(history):
-#     plt.figure(figsize=(12, 6))
-#     plt.plot(history.history['loss'], label='Training Loss')
-#     plt.plot(history.history['val_loss'], label='Validation Loss')
-#     plt.title('Model Training Progress')
-#     plt.xlabel('Epochs')
-#     plt.ylabel('Loss')
-#     plt.legend()
-#     plt.grid(True)
-#     plt.show()
+def plot_training_history(history):
+    plt.figure(figsize=(12, 6))
+    plt.plot(history.history['loss'], label='Training Loss')
+    plt.plot(history.history['val_loss'], label='Validation Loss')
+    plt.title('Model Training Progress')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
 
 # 데이터셋 생성
 def create_dataset(dataset, look_back):
@@ -147,26 +148,55 @@ def train_model_for_currency(train_X, train_Y, input_dims, time_steps, lstm_unit
     plot_training_history(history)
     return model
 
-# Main 함수 수정
+def save_model_for_tensorserving(model, currency_code, export_path='./models'):
+    """
+    Save the model in TensorFlow Serving format with proper versioning
+    
+    Args:
+        model: Trained Keras model
+        currency_code: Currency code used as model identifier
+        export_path: Base directory for saving serving models
+    """
+    import os
+    from datetime import datetime
+
+    # Create export directory for the currency code
+    currency_path = os.path.join(export_path, f"{currency_code}")
+    os.makedirs(currency_path, exist_ok=True)
+
+    # Find the next version number
+    existing_versions = [int(d) for d in os.listdir(currency_path) if d.isdigit()]
+    next_version = max(existing_versions) + 1 if existing_versions else 1
+
+    # Create full model export path with version
+    model_export_path = os.path.join(currency_path, str(next_version))
+    os.makedirs(model_export_path, exist_ok=True)
+
+    # Export model for TensorFlow Serving
+    model.export(model_export_path)
+    print(f"Model for {currency_code} saved in TensorFlow Serving format at: {model_export_path}")
+
 def main():
-    target_currencies = ['USD', 'CNY', 'JPY', 'EUR']
+    target_currencies = ['EUR']#['USD', 'CNY', 'JPY', 'EUR']
     exchange_df = load_data_from_sql()
     if exchange_df.empty:
         print("No data loaded. Exiting.")
         return
 
     exchange_df['TIME'] = pd.to_datetime(exchange_df['TIME'], errors='coerce')
-    exchange_df = exchange_df.dropna().sort_values(by='TIME')  # Drop rows with NaT or NaN
-    exchange_df['USD'] = pd.to_numeric(exchange_df['USD'], errors='coerce')  # 숫자로 변환
-    exchange_df['CNY'] = pd.to_numeric(exchange_df['CNY'], errors='coerce')  # 숫자로 변환
-    exchange_df['JPY'] = pd.to_numeric(exchange_df['JPY'], errors='coerce')  # 숫자로 변환
-    exchange_df['EUR'] = pd.to_numeric(exchange_df['EUR'], errors='coerce')  # 숫자로 변환
-
+    exchange_df = exchange_df.dropna().sort_values(by='TIME')
+    exchange_df['USD'] = pd.to_numeric(exchange_df['USD'], errors='coerce')
+    exchange_df['CNY'] = pd.to_numeric(exchange_df['CNY'], errors='coerce')
+    exchange_df['JPY'] = pd.to_numeric(exchange_df['JPY'], errors='coerce')
+    exchange_df['EUR'] = pd.to_numeric(exchange_df['EUR'], errors='coerce')
 
     TIME_STEPS = 60
     LSTM_UNITS = 64
     epochs = 20
     batch_size = 64
+
+    # Create base directory for TensorFlow Serving models
+    # os.makedirs('./tensorserving_models', exist_ok=True)
 
     for currency in target_currencies:
         if currency not in exchange_df.columns:
@@ -188,8 +218,16 @@ def main():
         train_X, test_X, train_Y, test_Y = train_test_split(train_X, train_Y, test_size=0.2, random_state=42)
 
         # 모델 학습
-        train_model_for_currency(train_X, train_Y, 1, TIME_STEPS, LSTM_UNITS, currency, epochs, batch_size)
-        print(f"{currency} 모델 학습 완료 및 저장: {currency}.h5")
+        model = attention_model(1, TIME_STEPS, LSTM_UNITS)
+        model.compile(loss='mse', optimizer='adam', metrics=['mse'])
+        model.fit(
+            [train_X], train_Y,
+            epochs=epochs, batch_size=batch_size, validation_split=0.25,
+            callbacks=[EarlyStopping(monitor='val_loss', patience=10, mode='min')]
+        )
 
+        # Save model in TensorFlow Serving format
+        save_model_for_tensorserving(model, currency)
 if __name__ == "__main__":
     main()
+

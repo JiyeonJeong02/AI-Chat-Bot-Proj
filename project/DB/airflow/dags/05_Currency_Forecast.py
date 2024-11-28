@@ -3,13 +3,14 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 import yfinance as yf
-from tensorflow.keras.models import load_model
+# from tensorflow.keras.models import load_model
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from dotenv import load_dotenv
 import os
 import pymysql
 from sqlalchemy import create_engine
+import requests
 
 load_dotenv()
 
@@ -75,12 +76,13 @@ def prepare_test_data(test_data, time_steps, normalize):
     return test_X, test_Y
 
 # 미래 예측 함수
-def predict_future(model, last_sequence, future_steps, normalize):
+def predict_future(model_url, last_sequence, future_steps, normalize):
     future_predictions = []
     current_sequence = last_sequence.copy()
 
     for _ in range(future_steps):
-        prediction = model.predict(current_sequence[np.newaxis, :, :])[0, 0]
+        # Use API call to fetch prediction
+        prediction = fetch_predictions_from_model(model_url, current_sequence[np.newaxis, :, :])[0, 0]
         # Denormalize prediction
         denormalized_prediction = prediction * (normalize[0, 1] - normalize[0, 0]) + normalize[0, 0]
         future_predictions.append(denormalized_prediction)
@@ -91,11 +93,13 @@ def predict_future(model, last_sequence, future_steps, normalize):
 
     return np.array(future_predictions)
 
-def evaluate_model(model_path, test_X, test_Y, normalize, currency, future_steps, test_time):
-    model = load_model(model_path)
+
+def evaluate_model(model_url, test_X, test_Y, normalize, currency, future_steps, test_time):
+    predictions = fetch_predictions_from_model(model_url, test_X)
+    predictions = np.array(list(predictions))
 
     # Generate predictions for test data
-    predictions = model.predict(test_X)
+    # predictions = model.predict(test_X)
     predictions = FNormalizeMult(predictions, normalize).flatten()  # Flatten to 1D array
     test_Y = test_Y.flatten()  # Flatten to 1D array
 
@@ -104,7 +108,7 @@ def evaluate_model(model_path, test_X, test_Y, normalize, currency, future_steps
 
     # Future Predictions
     last_sequence = test_X[-1]
-    future_predictions = predict_future(model, last_sequence, future_steps, normalize)
+    future_predictions = predict_future(model_url, last_sequence, future_steps, normalize)
 
     # Generate future time axis
     future_time = pd.date_range(test_time[-1], periods=future_steps + 1, freq='D')[1:]
@@ -140,7 +144,28 @@ def evaluate_model(model_path, test_X, test_Y, normalize, currency, future_steps
 
     return combined_df
 
+def fetch_predictions_from_model(url, input_data):
+    """
+    TensorFlow Serving 모델에서 예측값을 가져오는 함수.
 
+    :param url: 모델 REST API URL
+    :param input_data: 모델에 전달할 데이터 (numpy 배열 형태)
+    :return: 예측값 (numpy 배열 형태)
+    """
+    headers = {"Content-Type": "application/json"}
+    payload = {
+        "instances": input_data.tolist()  # numpy 배열을 리스트로 변환
+    }
+    response = requests.post(url, headers=headers, json=payload)
+    
+    if response.status_code == 200:
+        predictions = response.json()["predictions"]
+        return np.array(predictions)  # numpy 배열로 변환
+    else:
+        print(f"Error: {response.status_code}, {response.text}")
+        return None
+    
+    
 def run_prediction_and_upload():
     TIME_STEPS = 60
     FUTURE_STEPS = 60  # Number of future days to predict
@@ -164,7 +189,7 @@ def run_prediction_and_upload():
     for currency in target_currencies:
         print(f"Evaluating for currency: {currency}")
 
-        MODEL_PATH = f'./dags/package/{currency}.h5'
+        model_url = f"http://host.docker.internal:8501/v1/models/{currency}:predict"
 
         # 해당 통화의 데이터 가져오기 및 결측치 처리
         df = fill_na_with_avg(exchange_df[currency])
@@ -181,7 +206,7 @@ def run_prediction_and_upload():
         test_X, test_Y = prepare_test_data(test, TIME_STEPS, normalize)
 
         # 모델 평가 및 결과 저장
-        combined_df = evaluate_model(MODEL_PATH, test_X, test_Y, normalize, currency, FUTURE_STEPS, test_time)
+        combined_df = evaluate_model(model_url, test_X, test_Y, normalize, currency, FUTURE_STEPS, test_time)
 
         # Append to results
         results_list.append(combined_df)

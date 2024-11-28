@@ -1,0 +1,1 @@
+docker run -t --rm -p 8501:8501 -v C:\ITStudy\final_project\AI-Chat-Bot-Proj\project\FISA\eunji\Currency_Forecast\:/model_serving/ tensorflow/serving --rest_api_port=8501 --model_config_file=/model_serving/models.config

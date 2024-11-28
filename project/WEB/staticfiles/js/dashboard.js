@@ -86,16 +86,32 @@ const pageManager = {
 				.forEach((content) => {
 					content.classList.add("hidden");
 				});
-
 			const selectedContent = document.getElementById(
 				`dashboard-content-${pageId}`
 			);
 			if (selectedContent) {
 				selectedContent.classList.remove("hidden");
-
 				// 차트 리사이즈 디바운싱
 				this.triggerChartResize();
 			}
+			// 헤더 타이틀 업데이트
+			const headerTitles = {
+				one: {
+					title: "첫번째",
+					subtitle: "카드 사용 현황 및 분석 리포트",
+				},
+				two: {
+					title: "두번째",
+					subtitle: "회원 이용 패턴 및 분석",
+				},
+				three: {
+					title: "세번째",
+					subtitle: "워드 클라우드 및 감성 분석",
+				},
+			};
+			header = document.getElementById("dashboard-header");
+			header.querySelector("h1").textContent = headerTitles[pageId].title;
+			header.querySelector("p").textContent = headerTitles[pageId].subtitle;
 		});
 	},
 
