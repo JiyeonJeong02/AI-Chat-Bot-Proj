@@ -510,7 +510,7 @@ def cpi_card_predict_view():
 
         # 레이아웃 설정
         fig.update_layout(
-            title=f"{categories[0]} PCE 및 CPI 예측 시계열 데이터",
+            # title=f"{categories[0]} PCE 및 CPI 예측 시계열 데이터",
             xaxis=dict(title="시간"),
             yaxis=dict(title="PCE 지출", titlefont=dict(color="blue"), tickfont=dict(color="blue")),
             yaxis2=dict(

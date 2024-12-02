@@ -32,16 +32,24 @@ def create_currency_view():
     currencies = ["USD", "CNY", "JPY", "EUR"]
     sources = combined_data['SOURCE'].unique()
 
+    # SOURCE에 대한 한국어 매핑
+    source_mapping = {
+        "PREDICTION": "예측값",
+        "REAL": "실제값",
+        "FUTURE": "미래 예측값",
+    }
+
     # 통화 및 source에 따라 각각의 라인 추가
     for currency in currencies:
         for source in sources:
             filtered_data = combined_data[combined_data['SOURCE'] == source]
+            source_korean = source_mapping.get(source, source)  # 매핑에서 한국어 값 가져오기
             fig.add_trace(
                 go.Scatter(
                     x=filtered_data['TIME'],
                     y=filtered_data[currency],
                     mode='lines',
-                    name=f"{currency} ({source})",
+                    name=f"{currency} ({source_korean})",  # 한국어로 설명된 source 사용
                     visible=(currency == "USD"),  # 초기에는 USD만 표시
                 )
             )
@@ -81,5 +89,3 @@ def create_currency_view():
     )
 
     return to_json(fig)
-
-

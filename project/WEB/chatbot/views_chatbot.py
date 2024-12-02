@@ -11,65 +11,18 @@ from opensearchpy import OpenSearch
 import os
 from dotenv import load_dotenv
 
+from .models import ChatMessage
+import uuid
+from django.contrib.auth.decorators import login_required
+
 load_dotenv()
-############################################################################################################
-# 여기에 오픈 서치 내용 만들기
+
 client = OpenSearch(
     hosts = [{'host': os.getenv("OPENSEARCH_HOST"), 'port': os.getenv("OPENSEARCH_PORT")}]
 )
-def search_embedding(query_embedding):
-    """
-    주어진 임베딩에 가장 유사한 문서 검색.
-    """
-    index = 'korean_law_data'
-    num_results=10
-    field_name = "embedding_vector"  # 검색할 임베딩 필드
-    try:
-        body = {
-            "size": num_results,
-            "query": {
-                "script_score": {
-                    "query": {
-                        "match_all": {}
-                    },
-                    "script": {
-                        "source": f"cosineSimilarity(params.query_vector, '{field_name}') + 1.0",
-                        "params": {
-                            "query_vector": query_embedding
-                        }
-                    }
-                }
-            }
-        }
+openai = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
-        # 검색 실행
-        res = client.search(index=index, body=body)
-        return res
-    except Exception as e:
-        print(f"Error executing search: {e}")
-        return None
-    
-def os_output_text(query_embedding):
-    BEST_SCORE_THRESHOLD = 1.7
-    matched_texts = ""
-    best_score = 0
-
-    res = search_embedding(query_embedding)
-    if res:
-        i = 0
-        for hit in res['hits']['hits']:
-            score = hit['_score']
-            text = hit['_source'].get('content') 
-            # 임계값 이상의 점수를 가진 텍스트를 최대 5개까지 추가
-            if score >= BEST_SCORE_THRESHOLD and len(text) > 30 and i < 5:
-                matched_texts += text + "\n"
-                i += 1
-        best_score = res['hits']['hits'][0]['_score']
-        return matched_texts
-    else:
-        print('유사 항목 없음')
-############################################################################################################
-
+# 쿼리문 실행
 def execute_query_to_dataframe(query):
     try:
         # pandas의 read_sql 함수를 사용하여 쿼리 실행 및 DataFrame 생성
@@ -79,22 +32,14 @@ def execute_query_to_dataframe(query):
         print(f"Error executing query: {e}")
         return None
 
-# 쿼리 정의
-query = """
+table_query = """
 SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, TABLE_NAME
 FROM information_schema.COLUMNS
 WHERE TABLE_SCHEMA = 'team5'
 """
+result_df = execute_query_to_dataframe(table_query)
 
-# 쿼리 실행 및 DataFrame 생성
-result_df = execute_query_to_dataframe(query)
-
-# 연결 종료
-engine.dispose()
-
-OPENAI_API_KEY=os.getenv('OPENAI_API_KEY')
-openai = OpenAI(api_key=OPENAI_API_KEY)
-
+# 임베딩
 def get_embedding(text):
     if not text:
         return None
@@ -103,6 +48,8 @@ def get_embedding(text):
     embedding = res.data[0].embedding
     return embedding
 
+## 쿼리문 짜기
+# MySQL
 def generate_query(query):
     # 필드 정보 추출
     table_info = result_df.groupby('TABLE_NAME').apply(
@@ -127,6 +74,66 @@ def generate_query(query):
     generated_query = generated_query.replace("```sql","").replace("```","").strip()
     return generated_query
 
+# 법령데이터 OpenSearch 검색
+def search_documents(query):
+    query_embedding = get_embedding(query)
+    index_name = 'korean_law_data'
+    body = {
+        "query": {
+            "bool": {
+                "must": {
+                    "script_score": {
+                        "query": {"match_all": {}},
+                        "script": {
+                            "source": "cosineSimilarity(params.query_vector, doc['embedding_vector']) + 1.0",
+                            "params": {
+                                "query_vector": get_embedding(query)
+                            }
+                        }
+                    }
+                },
+                "filter": {
+                    "range": {
+                        "_score": {"gte": 1.7}
+                    }
+                }
+            }
+        },
+        "size": 3
+    }
+    results = client.search(index=index_name, body=body)
+    return [hit["_source"]['content'] for hit in results["hits"]["hits"]]
+
+
+# new_trend 오픈서치 검색
+def generate_opensearch_query(query) :
+    index_name = 'new_trend'
+    # 매핑정보 가져오기
+    mapping = client.indices.get_mapping(index=index_name)
+    # 필드 정보 추출
+    fields = list(mapping[index_name]['mappings']['properties'].keys())
+    fields_info = ", ".join(fields)
+    # 프롬포트 생성
+    prompt = f"The index {index_name} has the following fields : {fields_info}, Write an only OpenSearch query for the following question : {query}"
+    response = openai.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "You are an excellent ElasticSearch query creator. Only provide ElasticSearch queries. You must include a filter for score greater than or equal to 1.7."},
+            {"role": "user", "content": prompt}
+        ]
+    )
+    generate_query = response.choices[0].message.content
+    generate_query = generate_query.replace("```json","").replace("```","").strip()
+
+    relevant_docs = client.search(
+        index=index_name,
+        body = generate_query)
+    
+    return relevant_docs
+
+
+## POWER MODE 코드
+# 위키피디아 검색
 def get_wikipedia_content(keyword):
     try:
         encoded_keyword = urllib.parse.quote(keyword)
@@ -154,43 +161,8 @@ def get_wikipedia_content(keyword):
         
     except Exception as e:
         return f"Wikipedia 검색 중 오류 발생: {str(e)}"
-
-def answer_question_with_context(query, context=None):
-    # Search for relevant documents
-    search_query = generate_query(query)
-    ############################################################################################################
-    # 여기에 오픈 서치 내용 만들기
-    embedding_qury = get_embedding(query)
-    os_relevant_docs = os_output_text(embedding_qury)
-    ############################################################################################################   
-    relevant_docs = execute_query_to_dataframe(search_query)
     
-    # 컨텍스트가 있는 경우와 없는 경우에 따라 프롬프트 구성
-    context_text = f"\nAdditional context from Wikipedia:\n{context}" if context else ""
-    
-    prompt = f"""
-    The following is a table of data extracted from an OpenSearch query:\n\n{os_relevant_docs}\n\n{relevant_docs}\n
-    {context_text}\n
-    Based on this data and context, provide an effective and detailed answer to the following natural language query: {query}
-    
-    Please follow these guidelines when answering:
-    1. Provide accurate and concise answers based on both the data and Wikipedia context if available.
-    2. Only mention information relevant to the question.
-    3. If using Wikipedia information, integrate it naturally with the database information.
-    4. Write your answer in Korean and keep it under 800 characters.
-    
-    Answer: """
-
-    response = openai.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": "Your name is 우대리, You are an excellent assistant proficient in data analysis"},
-            {"role": "user", "content": prompt}
-        ],
-        max_tokens=800
-    )
-    return response.choices[0].message.content
-
+# 구글 검색
 def extract_keywords(text):
     """사용자 메시지에서 핵심 키워드 추출"""
     prompt = f"""
@@ -251,6 +223,44 @@ def get_google_search_content(keyword):
         return f"검색 중 오류 발생: {str(e)}"
 
 
+# 최종 응답
+def answer_question_with_context(query, context=None):
+    # Search for relevant documents
+    # mysql
+    search_query = generate_query(query)
+    relevant_docs = execute_query_to_dataframe(search_query)
+    
+    # 오픈서치
+    os_relevant_docs = search_documents(query)
+    newtrend_docs = generate_opensearch_query(query)
+    
+    # 컨텍스트가 있는 경우와 없는 경우에 따라 프롬프트 구성
+    context_text = f"\nAdditional context from Wikipedia:\n{context}" if context else ""
+    
+    prompt = f"""
+    The following is a table of data extracted from an MySQL query and OpenSearch query:\n\n{os_relevant_docs}\n\n{relevant_docs}\n\n{newtrend_docs}\n 
+    {context_text}\n
+    Based on this data and context, provide an effective and detailed answer to the following natural language query: {query}
+    
+    Please follow these guidelines when answering:
+    1. Provide accurate and concise answers based on both the data and Wikipedia context if available.
+    2. Only mention information relevant to the question.
+    3. If using Wikipedia information, integrate it naturally with the database information.
+    4. If you cannot respond answer based on data and context, you should answer "죄송합니다. 데이터가 없습니다." Only.
+    5. Write your answer in Korean and keep it under 800 characters.
+    
+    Answer: """
+
+    response = openai.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "Your name is 우대리, You are an excellent assistant proficient in data analysis"},
+            {"role": "user", "content": prompt}
+        ],
+        max_tokens=800
+    )
+    return response.choices[0].message.content
+
 
 # 대시보드 인사이트 요약 챗봇 (mini)
 @csrf_exempt
@@ -305,7 +315,22 @@ def chatbot_response(request):
                 search_context = get_google_search_content(keyword)
                 print(f"Google 검색 컨텍스트: {search_context[:100]}...")  # 디버깅용
             
-            bot_response = f"우대리: {answer_question_with_context(user_message, search_context)}"
+            # 세션 ID 생성 또는 가져오기
+            session_id = request.session.get('chat_session_id')
+            if not session_id:
+                session_id = str(uuid.uuid4())
+                request.session['chat_session_id'] = session_id
+            
+            bot_response = f"{answer_question_with_context(user_message, search_context)}"
+
+            # 대화 저장
+            ChatMessage.objects.create(
+                user=request.user,
+                message=user_message,
+                response=bot_response,
+                is_power_mode=is_power_mode,
+                session_id=session_id
+            )
             
             return JsonResponse({
                 'status': 'success',
@@ -429,3 +454,57 @@ class InsightGenerator:
             return response.choices[0].message.content.strip()
         except Exception as e:
             return "분석 준비중입니다."
+
+## 히스토리 함수
+@login_required
+def initialize_chat_session(request):
+    if 'chat_session_id' not in request.session:
+        request.session['chat_session_id'] = str(uuid.uuid4())
+    return JsonResponse({'session_id': request.session['chat_session_id']})
+
+@login_required
+def get_chat_history(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'messages': []})
+
+    session_id = request.session.get('chat_session_id')
+    messages = ChatMessage.objects.filter(
+        user=request.user,
+        session_id=session_id
+    ).order_by('created_at')
+    
+    history = [{
+        'message': msg.message,
+        'response': msg.response,
+        'timestamp': msg.created_at.isoformat()
+    } for msg in messages]
+    
+    return JsonResponse({'messages': history})
+
+@login_required
+def get_chat_sessions(request):
+    sessions = ChatMessage.objects.filter(user=request.user)\
+        .values('session_id').annotate(
+            last_message=models.Max('message'),
+            timestamp=models.Max('created_at')
+        )\
+        .order_by('-timestamp')
+    
+    return JsonResponse({
+        'sessions': list(sessions)
+    })
+
+@login_required
+def get_session_messages(request, session_id):
+    messages = ChatMessage.objects.filter(
+        user=request.user,
+        session_id=session_id
+    ).order_by('created_at')
+    
+    return JsonResponse({
+        'messages': [{
+            'message': msg.message,
+            'response': msg.response,
+            'timestamp': msg.created_at.isoformat()
+        } for msg in messages]
+    })

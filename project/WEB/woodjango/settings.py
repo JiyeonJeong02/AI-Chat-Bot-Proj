@@ -207,3 +207,7 @@ CACHES = {
         'LOCATION': 'unique-snowflake',
     }
 }
+
+# 세션 설정
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+SESSION_COOKIE_AGE = 86400  # 24시간

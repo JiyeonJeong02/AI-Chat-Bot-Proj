@@ -35,6 +35,7 @@ RUN pip install --no-cache-dir --upgrade \
     wordcloud \
     gensim \
     openai \
+    sklearn \
     opensearch-py \
     protobuf==3.20.*
 
@@ -52,9 +53,10 @@ RUN pip install --no-cache-dir --upgrade \
 RUN pip install --no-cache-dir --upgrade \
     nltk \ 
     torch \
-    shapely
+    shapely \
+    transformers
 
-RUN pip install transformers
+RUN pip install scikit-learn
 
 # Airflow 웹 서버 시작
 CMD ["airflow", "webserver"]

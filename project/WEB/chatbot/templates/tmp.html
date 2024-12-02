@@ -43,6 +43,11 @@
             background-color: #e5e7eb;
             cursor: pointer;
         }
+        
+        #history-window {
+            z-index: 1000 ;
+            box-shadow: 0 4px 6px 4px rgba(0, 0, 0, 0.1), 0 2px 4px 2px rgba(0, 0, 0, 0.06);
+        }
 
         #chat-window {
             z-index: 1000;
@@ -194,6 +199,15 @@
                 </svg>
             </button>
 
+            <!-- history icon -->
+            <button id="history-btn" class="history-btn p-2 text-gray-600 hover:bg-gray-200 rounded-xl transition-all duration-200 hover:scale-110 active:scale-95">
+                <svg xmlns="http://www.w3.org/2000/svg"  class="w-8 h-8" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M8.515 1.019A7 7 0 0 0 8 1V0a8 8 0 0 1 .589.022zm2.004.45a7 7 0 0 0-.985-.299l.219-.976q.576.129 1.126.342zm1.37.71a7 7 0 0 0-.439-.27l.493-.87a8 8 0 0 1 .979.654l-.615.789a7 7 0 0 0-.418-.302zm1.834 1.79a7 7 0 0 0-.653-.796l.724-.69q.406.429.747.91zm.744 1.352a7 7 0 0 0-.214-.468l.893-.45a8 8 0 0 1 .45 1.088l-.95.313a7 7 0 0 0-.179-.483m.53 2.507a7 7 0 0 0-.1-1.025l.985-.17q.1.58.116 1.17zm-.131 1.538q.05-.254.081-.51l.993.123a8 8 0 0 1-.23 1.155l-.964-.267q.069-.247.12-.501m-.952 2.379q.276-.436.486-.908l.914.405q-.24.54-.555 1.038zm-.964 1.205q.183-.183.35-.378l.758.653a8 8 0 0 1-.401.432z"/>
+                    <path d="M8 1a7 7 0 1 0 4.95 11.95l.707.707A8.001 8.001 0 1 1 8 0z"/>
+                    <path d="M7.5 3a.5.5 0 0 1 .5.5v5.21l3.248 1.856a.5.5 0 0 1-.496.868l-3.5-2A.5.5 0 0 1 7 9V3.5a.5.5 0 0 1 .5-.5"/>
+                  </svg>
+            </button>
+
             <!-- split line -->
             <div class="h-[1px] w-full bg-gray-200 my-2"></div>
 
@@ -220,6 +234,21 @@
         </div>
     </div>
     <!-- End of Sidebar -->
+
+    <!-- 히스토리 창 -->
+    <div class="offcanvas" tabindex="-1">
+        <div id="history-window" class="fixed bottom-4 left-16 w-[40rem] h-[40rem] bg-white rounded-lg shadow-xl scale-0 transition-all duration-200 origin-bottom-left">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h3 id="session" class="text-lg font-semibold">대화 기록</h3>
+                <button id="close-history" class="text-gray-500 hover:text-gray-700">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div id="history-messages" class="flex-1 overflow-y-scroll max-h-[calc(100vh-200px)] p-4 space-y-4"></div>
+        </div>
+    </div>
 
     <!-- Chat Window -->
     <div class="offcanvas" tabindex="-1">
@@ -281,22 +310,22 @@
             <!-- Indicator Row -->
             <div class="col-span-12 row-span-1 grid grid-cols-6 gap-4 h-[calc(20vh)]">
                 <div class="bg-white shadow-md p-3 rounded-lg">
-                    <h3 class="text-lg font-semibold mb-2">금리</h3>
+                    <h3 class="text-lg font-semibold mb-2">한국 금리</h3>
                     <div id="bankrate_indicator_json" class="h-[calc(100%-2rem)] overflow-hidden">
                     </div>
                 </div>
                 <div class="bg-white shadow-md p-3 rounded-lg">
-                    <h3 class="text-lg font-semibold mb-2">GDP</h3>
+                    <h3 class="text-lg font-semibold mb-2">한국 GDP</h3>
                     <div id="K_GDP_indicator_json" class="h-[calc(100%-2rem)] overflow-hidden">
                     </div>
                 </div>
                 <div class="bg-white shadow-md p-3 rounded-lg">
-                    <h3 class="text-lg font-semibold mb-2">CPI</h3>
+                    <h3 class="text-lg font-semibold mb-2">한국 CPI</h3>
                     <div id="K_cpi_indicator_json" class="h-[calc(100%-2rem)] overflow-hidden">
                     </div>
                 </div>
                 <div class="bg-white shadow-md p-3 rounded-lg">
-                    <h3 class="text-lg font-semibold mb-2">PCE</h3>
+                    <h3 class="text-lg font-semibold mb-2">한국 PCE</h3>
                     <div id="K_pce_indicator_json" class="h-[calc(100%-2rem)] overflow-hidden">
                     </div>
                 </div>
@@ -306,7 +335,7 @@
                     </div>
                 </div>
                 <div class="bg-white shadow-md p-3 rounded-lg">
-                    <h3 class="text-lg font-semibold mb-2">경제성장률</h3>
+                    <h3 class="text-lg font-semibold mb-2">한국 경제성장률</h3>
                     <div id="K_growth_indicator_json" class="h-[calc(100%-2rem)] overflow-hidden">
                     </div>
                 </div>
@@ -316,7 +345,7 @@
             <div class=" col-span-6 row-span-1 bg-white shadow-md p-3 rounded-lg">
                 <div class="flex flex-col h-full w-full">
                     <div class="mb-2">
-                        <h3 class="text-lg font-semibold mb-3">거시 경제 지표(미국)</h3>
+                        <h3 class="text-lg font-semibold mb-3">미국의 거시 경제 현황 확인</h3>
                         <div class="toggle-container">
                             <button class="toggle-button inactive" data-chart="economic">종합지표</button>
                             <button class="toggle-button active" data-chart="gdp">기초 지표</button>
@@ -346,20 +375,24 @@
                             <div id="employment_trends_json">
                             </div>
                         </div>
+                        <p class="text-xs text-gray-400 text-right">※ 데이터 출처: Federal Reserve Economic Data(FRED)</p>
                     </div>
                 </div>
             </div>
-            <div class="col-span-6 row-span-2 bg-white shadow-md p-2 rounded-lg flex flex-col h-[calc(100%)]">
-                <h3 class="text-base font-semibold mb-1">은채 워드클라우드</h3>
+            <div class="col-span-6 row-span-2 bg-white shadow-md p-2 rounded-lg flex flex-col h-[calc(80%)]">
+                <h3 class="text-base font-semibold mb-1">뉴스 트랜드</h3>
+                <p class="text-sm text-gray-500 mb-3">뉴스 핵심 키워드를 분석을 통한 워드클라우드와 키워드 변동률 시각화</p>
                 <div class="flex-1">
                     <iframe src="http://192.168.0.101:5602/goto/4418ab1823a219ccd90b45dc6cd8a1d9" class="w-full h-full"
                         style="min-height: 100%; border: none;" loading="lazy"
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                         referrerpolicy="no-referrer"></iframe>
                 </div>
+                <p class="text-xs text-gray-400 text-right">※ 데이터 출처 : 네이버 뉴스</p>
             </div>
             <div class="col-span-6 row-span-1 bg-white shadow-md p-3 rounded-lg">
-                <h3 class="text-lg font-semibold mb-2">호섭 그래프</h3>
+                <h3 class="text-lg font-semibold mb-2">소비자 물가지수 및 카드 소비 내역</h3>
+                <p class="text-sm text-gray-500 mb-3">합계 PCE 및 CPI의 실제값과 예측값</p>
                 <div id="cpi_card_predict_json">
                 </div>
             </div>
@@ -368,58 +401,79 @@
         <!-- Dashboard Content two -->
         <div id="dashboard-content-two" class="grid grid-cols-12 p-3 gap-4 hidden">
             <div class="col-span-4 row-span-1 bg-white shadow-md p-3 rounded-lg">
-                <h3 class="text-lg font-semibold mb-2">카드사별 총 사용금액</h3>
+                <h3 class="text-lg font-semibold mb-2">카드사별 경쟁 현황</h3>
+                <p class="text-sm text-gray-500 mb-3">카드사 별 총 매출액</p>
                 <div id="card_total_sales_ladar_json">
+                <p class="text-xs text-gray-400 text-right">※ 데이터 출처 : 여신금융협회</p>
                 </div>
             </div>
             <div class="col-span-4 row-span-1 bg-white shadow-md p-3 rounded-lg">
-                <h3 class="text-lg font-semibold mb-2">우리카드 실제 현황</h3>
+                <h3 class="text-lg font-semibold mb-2">우리카드 매출 구성</h3>
+                <p class="text-sm text-gray-500 mb-3">우리카드 이용실적에 따른 매출 구성</p>
                 <div id="wooricard_sales_treemap_json">
+                <p class="text-xs text-gray-400 text-right">※ 데이터 출처 : 여신금융협회</p>
                 </div>
             </div>
             <div class="col-span-4 row-span-1 bg-white shadow-md p-3 rounded-lg">
-                <h3 class="text-lg font-semibold">소비 카테고리 현황</h3>
+                <h3 class="text-lg font-semibold">우리카드 매출 카테고리 현황</h3>
+                
                 <div id="gender_json">
+                <p class="text-xs text-gray-400 text-right">※ 데이터 출처 : 우리카드 내부 데이터</p>
                 </div>
             </div>
             <div class="col-span-7 row-span-1 bg-white shadow-md p-3 rounded-lg">
-                <h3 class="text-lg font-semibold">카드사별 세부구성 비교</h3>
+                <h3 class="text-lg font-semibold">카드사별 매출 구성 비교</h3>
                 <div id="create_card_heatmap_json">
+                <p class="text-xs text-gray-400 text-right">※ 데이터 출처 : 여신금융협회</p>
                 </div>
             </div>
             <div class="col-span-5 row-span-1 bg-white shadow-md p-3 rounded-lg">
-                <h3 class="text-lg font-semibold mb-2">법률 정보</h3>
+                <h3 class="text-lg font-semibold mb-2">입법예고/규정변경예고</h3>
                 <div class="overflow-y-auto max-h-[30rem]">
                     {% for law in korean_law_html %}
                     <div class="mb-4 pb-3 border-b border-gray-200 last:border-b-0 last:mb-0">
-                        <p class="font-semibold text-gray-800 text-sm mb-1">{{ law.title }}</p>
+                        <a href="{{ law.URL }}" class="flex items-center font-semibold text-gray-800 text-sm mb-1 hover:underline" target="_blank" aria-label="바로가기">
+                            {{ law.title }}
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-box-arrow-up-right ml-2" viewBox="0 0 16 16">
+                                <path fill-rule="evenodd" d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5"/>
+                                <path fill-rule="evenodd" d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0z"/>
+                            </svg>
+                        </a>
                         <p class="text-xs text-gray-500 mb-1">시행일: {{ law.start_date }} ~ {{ law.end_date }}</p>
                         <p class="text-xs text-gray-600 leading-relaxed">{{ law.summary }}</p>
                     </div>
                     {% endfor %}
                 </div>
+                <p class="text-xs text-gray-400 text-right">※ 데이터 출처 : 금융 위원회</p>
             </div>
         </div>
         <!-- Dashboard Content three -->
         <div id="dashboard-content-three" class="grid grid-cols-12 p-3 gap-4 hidden">
             <div class="col-span-5 row-span-1 bg-white shadow-md p-3 rounded-lg">
-                <h3 class="text-lg font-semibold mb-2">트래블 카드 지도</h3>
+                <h3 class="text-lg font-semibold mb-2">여행 경보</h3>
+                <p class="text-sm text-gray-500 mb-3">여행 경보는 현재 국가별 안전 상태를 안내하기 위한 정보</p>
                 <div id="visualize_travel_advice_json">
+                <p class="text-xs text-gray-400 text-right">※ 데이터 출처 : 외교부 해외안전여행</p>
                 </div>
             </div>
             <div class="col-span-7 row-span-1 bg-white shadow-md p-3 rounded-lg">
-                <h3 class="text-lg font-semibold">환율 데이터</h3>
+                <h3 class="text-lg font-semibold">환율</h3>
+                <p class="text-sm text-gray-500 mb-3">미국(USD), 중국(CNY), 일본(JPY),유럽(EUR)의 실제 환율과 예측값</p>
                 <div id="currency_rates_json">
+                <p class="text-xs text-gray-400 text-right">※ 본 예측은 과거 데이터를 기반으로 하며 실제 환율과 차이가 있을 수 있습니다.</p>
                 </div>
             </div>
             <div class="col-span-6 row-span-1 bg-white shadow-md p-3 rounded-lg">
-                <h3 class="text-lg font-semibold">여행 설문조사</h3>
+                <h3 class="text-lg font-semibold">여행 관심 변화 설문조사</h3>
                 <div id="tour_servey_json">
+                <p class="text-xs text-gray-400 text-right">※ 데이터 출처 : 컨슈머인사이트</p>
                 </div>
             </div>
             <div class="col-span-6 row-span-1 bg-white shadow-md p-3 rounded-lg">
-                <h3 class="text-lg font-semibold">네이버 여행지역 트렌드: 변동성이 큰 여행 관심 TOP 10 국가 (30개국 중)</h3>
+                <h3 class="text-lg font-semibold">여행 지역 검색 트렌드</h3>
+                <p class="text-sm text-gray-500 mb-3">검색량 상위 30개국 중 검색 변동성이 가장 큰 여행지 TOP 10</p>
                 <div id="travel_trend_line_json">
+                <p class="text-xs text-gray-400 text-right">※ 데이터 출처 : 네이버 데이터 랩</p>
                 </div>
             </div>
         </div>
@@ -427,6 +481,53 @@
 
     <script nonce="{{ nonce }}">
         document.addEventListener('DOMContentLoaded', function () {
+            const historyBtn = document.getElementById('history-btn');
+            const historyWindow = document.getElementById('history-window');
+            const closeHistory = document.getElementById('close-history');
+            const historyMessages = document.getElementById('history-messages');
+
+            // 히스토리 버튼 클릭 이벤트
+            historyBtn.addEventListener('click', function() {
+                if (historyWindow.classList.contains('scale-0')) {
+                    historyWindow.classList.remove('scale-0');
+                    historyWindow.classList.add('scale-100');
+                    loadHistoryMessages();
+                } else {
+                    closeHistoryWindow();
+                }
+            });
+
+            // 닫기 버튼 클릭 이벤트
+            closeHistory.addEventListener('click', closeHistoryWindow);
+
+            function closeHistoryWindow() {
+                historyWindow.classList.remove('scale-100');
+                historyWindow.classList.add('scale-0');
+            }
+
+            async function loadHistoryMessages() {
+                try {
+                    const response = await fetch('/chatbot/history/');
+                    const data = await response.json();
+                    
+                    historyMessages.innerHTML = '';
+                    data.messages.forEach(msg => {
+                        const messageDiv = document.createElement('div');
+                        messageDiv.className = 'mb-4 p-3 bg-gray-50 rounded-lg';
+                        messageDiv.innerHTML = `
+                            <div class="text-sm text-gray-500 mb-1">
+                                ${new Date(msg.timestamp).toLocaleString()}
+                            </div>
+                            <div class="text-gray-700">${msg.message}</div>
+                            <div class="text-blue-600 mt-2">${msg.response}</div>
+                        `;
+                        historyMessages.appendChild(messageDiv);
+                    });
+                } catch (error) {
+                    console.error('히스토리 로드 실패:', error);
+                }
+            }
+
             const chartData = {
                 bankrate_indicator_json: JSON.parse('{{ bankrate_indicator_json|escapejs }}'),
                 K_GDP_indicator_json: JSON.parse('{{ K_GDP_indicator_json|escapejs }}'),

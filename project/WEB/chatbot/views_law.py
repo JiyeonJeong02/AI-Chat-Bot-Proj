@@ -46,6 +46,7 @@ def korean_law_view():
             "end_date": source.get("end_date"),
             "title": source.get("title"),
             "summary": source.get("summary"),
+            "URL":source.get("URL")
         })
 
     return results

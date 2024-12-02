@@ -20,18 +20,18 @@ def load_data_from_sql():
 def df_rename():
     df = load_data_from_sql()
     column_mapping = {
-    "CHINA_TOUR_INTRST_VALUE": "중국여행관심값",
-    "JP_TOUR_INTRST_VALUE": "일본여행관심값",
-    "HONGKONG_MACAU_TOUR_INTRST_VALUE": "홍콩마카오여행관심값",
-    "SEASIA_TOUR_INTRST_VALUE": "동남아시아여행관심값",
-    "MDLEST_SWASIA_TOUR_INTRST_VALUE": "중동서남아시아여행관심값",
-    "USA_CANADA_TOUR_INTRST_VALUE": "미국캐나다여행관심값",
-    "SAMRC_LAMRC_TOUR_INTRST_VALUE": "남미중남미여행관심값",
-    "WEURP_NEURP_TOUR_INTRST_VALUE": "서유럽북유럽여행관심값",
-    "EEURP_TOUR_INTRST_VALUE": "동유럽여행관심값",
-    "SEURP_TOUR_INTRST_VALUE": "남유럽여행관심값",
-    "SPCPC_TOUR_INTRST_VALUE": "남태평양여행관심값",
-    "AFRICA_TOUR_INTRST_VALUE": "아프리카여행관심값",
+    "CHINA_TOUR_INTRST_VALUE": "중국",
+    "JP_TOUR_INTRST_VALUE": "일본",
+    "HONGKONG_MACAU_TOUR_INTRST_VALUE": "홍콩마카오",
+    "SEASIA_TOUR_INTRST_VALUE": "동남아시아",
+    "MDLEST_SWASIA_TOUR_INTRST_VALUE": "중동서남아시아",
+    "USA_CANADA_TOUR_INTRST_VALUE": "미국캐나다",
+    "SAMRC_LAMRC_TOUR_INTRST_VALUE": "남미중남미",
+    "WEURP_NEURP_TOUR_INTRST_VALUE": "서유럽북유럽",
+    "EEURP_TOUR_INTRST_VALUE": "동유럽",
+    "SEURP_TOUR_INTRST_VALUE": "남유럽",
+    "SPCPC_TOUR_INTRST_VALUE": "남태평양",
+    "AFRICA_TOUR_INTRST_VALUE": "아프리카",
     }
 
     # 컬럼명 변경
@@ -44,9 +44,9 @@ def tour_servey():
     melted = df.melt(
         id_vars=["RESPOND_ID", "SEXDSTN_FLAG_CD", "AGRDE_FLAG_NM"],
         value_vars=[
-            '중국여행관심값', '일본여행관심값', '홍콩마카오여행관심값', '동남아시아여행관심값', '중동서남아시아여행관심값',
-            '미국캐나다여행관심값', '남미중남미여행관심값', '서유럽북유럽여행관심값', '동유럽여행관심값', '남유럽여행관심값',
-            '남태평양여행관심값', '아프리카여행관심값'],
+            '중국', '일본', '홍콩마카오', '동남아시아', '중동서남아시아',
+            '미국캐나다', '남미중남미', '서유럽북유럽', '동유럽', '남유럽',
+            '남태평양', '아프리카'],
         var_name="Region",
         value_name="Interest Change",
     )
@@ -61,7 +61,7 @@ def tour_servey():
         melted,
         x="Region",
         color="Interest Change",
-        title="여행 관심 변화",
+        # title="여행 관심 변화",
         labels={"Region": "지역", "value": "빈도", "Interest Change": "관심 변화 수준"},
         barmode="stack",  # 누적 막대그래프
     )

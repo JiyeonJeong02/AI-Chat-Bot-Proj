@@ -26,16 +26,11 @@ NAVER_CLIENT_ID = os.getenv("NAVER_API_ID")
 NAVER_CLIENT_SECRET = os.getenv("NAVER_API_SECRET")
 
 # OpenSearch 설정
-host = os.getenv("HOST")
-port = os.getenv("PORT")
-auth = (os.getenv("OPENSEARCH_ID"), os.getenv("OPENSEARCH_PASSWORD"))
+op_host = os.getenv("HOST")
+op_port = os.getenv("PORT")
 
 client = OpenSearch(
-    hosts=[{'host': host, 'port': port}],
-    # http_auth=auth,
-    use_ssl=False,
-    verify_certs=False
-)
+    hosts=[{'host': op_host, 'port': op_port}])
 
 def fetch_news_by_category(sid):
     """주어진 카테고리 ID에 대한 뉴스 기사를 크롤링하여 제목, 날짜, 본문 및 링크를 수집하는 함수."""
