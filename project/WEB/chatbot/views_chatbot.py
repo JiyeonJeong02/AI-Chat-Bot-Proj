@@ -39,6 +39,57 @@ WHERE TABLE_SCHEMA = 'team5'
 """
 result_df = execute_query_to_dataframe(table_query)
 
+# 데이터 요약 유틸리티
+def summarize_multiple_indicators(dataframe):
+    try:
+        summaries = []
+        numeric_columns = dataframe.select_dtypes(include=['float64', 'int64']).columns
+        for col in numeric_columns:
+            latest_value = dataframe[col].iloc[-1]
+            initial_value = dataframe[col].iloc[0]
+            change = latest_value - initial_value
+            change_pct = (change / initial_value) * 100 if initial_value != 0 else 0
+
+            summary = {
+                "indicator": col,
+                "latest_value": latest_value,
+                "initial_value": initial_value,
+                "change": change,
+                "change_pct": change_pct
+            }
+            summaries.append(summary)
+
+        return summaries
+    except Exception as e:
+        print(f"Error summarizing indicators: {e}")
+        return []
+
+# 요약 데이터를 보기 쉽게 포맷팅
+def format_summary_data(summaries):
+    formatted = []
+    for summary in summaries:
+        formatted.append(f"{summary['indicator']} - 현재: {summary['latest_value']:.2f}, 초기: {summary['initial_value']:.2f}, 변화: {summary['change']:.2f}, 변화율: {summary['change_pct']:.2f}%")
+    return "\n".join(formatted)
+
+# 데이터 요약 텍스트 생성
+def generate_summary_text(chart_id, dataframe):
+    if dataframe.empty:
+        return "해당 데이터가 비어있습니다."
+
+    summaries = summarize_multiple_indicators(dataframe)
+    formatted_summary = format_summary_data(summaries)
+
+    context_map = {
+        'economic_indicators_table_json': "경제 지표 요약"
+    }
+
+    return f"""
+    차트: {context_map.get(chart_id, '데이터 요약')}
+    데이터 요약:
+    {formatted_summary}
+    """
+
+
 # 임베딩
 def get_embedding(text):
     if not text:
@@ -262,9 +313,10 @@ def answer_question_with_context(query, context=None):
     return response.choices[0].message.content
 
 
-# 대시보드 인사이트 요약 챗봇 (mini)
+
 @csrf_exempt
 def chatbot_response(request):
+    # 대시보드 인사이트 요약 챗봇 (mini)
     # GET 및 POST 요청을 처리하여 대시보드와 챗봇의 인사이트 및 대화 기능을 제공
     if request.method == 'GET':
         # GET 요청 처리: 차트 데이터를 기반으로 인사이트 생성
@@ -352,44 +404,109 @@ class InsightGenerator:
     def get_chart_data(self, chart_id):
         """차트 ID에 따른 실제 데이터 조회"""
         try:            
-            # 차트 ID별 쿼리 매핑
+            # 차트 ID별 쿼리 매핑 - 최신 데이터 우선 조회하도록 수정
             query_map = {
-                'bankrate_indicator_json': "SELECT bor FROM team5.korea_base_rate ORDER BY time DESC LIMIT 10",
-                'K_GDP_indicator_json': "SELECT GDP FROM team5.korea_index ORDER BY TIME desc LIMIT 10",
-                'K_cpi_indicator_json': "SELECT TOTAL FROM team5.cpi_data ORDER BY TIME DESC LIMIT 10",
-                'K_pce_indicator_json': "SELECT DATA_VALUE FROM team5.pce_data ORDER BY TIME DESC LIMIT 10",
-                'K_USD_indicator_json': "SELECT USD FROM team5.currency_rate ORDER BY TIME desc LIMIT 10",
-                'K_growth_indicator_json': "SELECT 경제성장률 FROM korea_index ORDER BY TIME desc LIMIT 10",
-                'economic_indicators_table_json': "WITH MaxDate AS (SELECT MAX(date) as latest_date FROM fred_data) SELECT * FROM fred_data WHERE date >= DATE_SUB((SELECT latest_date FROM MaxDate), INTERVAL 5 YEAR) AND date <= (SELECT latest_date FROM MaxDate) ORDER BY date ASC",
-                'gdp_rates_json': "SELECT * FROM team5.gdp_rates ORDER BY date DESC LIMIT 10",
-                'price_indicators_json': "SELECT * FROM team5.price_indicators ORDER BY date DESC LIMIT 10",
-                'consumer_trends_json': "SELECT * FROM team5.consumer_trends ORDER BY date DESC LIMIT 10",
-                'employment_trends_json': "SELECT * FROM team5.employment_trends ORDER BY date DESC LIMIT 10",
-                'cpi_card_predict_json': "SELECT * FROM team5.cpi_card_predict ORDER BY date DESC LIMIT 10",
-                'card_total_sales_ladar_json': "SELECT * FROM team5.card_sales ORDER BY date DESC LIMIT 10",
-                'wooricard_sales_treemap_json': "SELECT * FROM team5.woori_card ORDER BY date DESC LIMIT 10",
-                'gender_json': "SELECT * FROM team5.card_category_gender ORDER BY date DESC LIMIT 10",
-                'create_card_heatmap_json': "SELECT * FROM team5.card_heatmap ORDER BY date DESC LIMIT 10",
-                'tour_servey_json': "SELECT * FROM team5.tour_survey ORDER BY date DESC LIMIT 10",
-                'travel_trend_line_json': "SELECT * FROM team5.travel_trend ORDER BY date DESC LIMIT 10",
-                'currency_rates_json': "SELECT * FROM team5.currency_rates ORDER BY date DESC LIMIT 10",
-                'visualize_travel_advice_json': "SELECT * FROM team5.travel_caution ORDER BY date DESC LIMIT 10"
+                # 기준금리 (이전 3.25에서 3.00으로 변경)
+                'bankrate_indicator_json': """
+                    SELECT bor, time 
+                    FROM team5.korea_base_rate 
+                    ORDER BY time DESC 
+                    LIMIT 2
+                """,
+                
+                # 한국 GDP (638k)
+                'K_GDP_indicator_json': """
+                    SELECT GDP, TIME 
+                    FROM team5.korea_index 
+                    ORDER BY TIME DESC 
+                    LIMIT 2
+                """,
+                
+                # 한국 CPI (114.7)
+                'K_cpi_indicator_json': """
+                    SELECT TOTAL, TIME 
+                    FROM team5.cpi_data 
+                    ORDER BY TIME DESC 
+                    LIMIT 2
+                """,
+                
+                # 한국 PCE (1.3)
+                'K_pce_indicator_json': """
+                    SELECT DATA_VALUE, TIME 
+                    FROM team5.pce_data 
+                    ORDER BY TIME DESC 
+                    LIMIT 2
+                """,
+                
+                # 달러 환율 (1395)
+                'K_USD_indicator_json': """
+                    SELECT USD, TIME 
+                    FROM team5.currency_rate 
+                    ORDER BY TIME DESC 
+                    LIMIT 2
+                """,
+                
+                # 한국 경제성장률 (-0.228)
+                'K_growth_indicator_json': """
+                    SELECT 경제성장률, TIME 
+                    FROM team5.korea_index 
+                    ORDER BY TIME DESC 
+                    LIMIT 2
+                """, 
+
+                # 미국 거시 경제 지표
+                'economic_indicators_table_json': """
+                WITH MaxDate AS (
+                    SELECT MAX(date) as latest_date
+                    FROM fred_data
+                )
+                SELECT *
+                FROM fred_data
+                WHERE date >= DATE_SUB((SELECT latest_date FROM MaxDate), INTERVAL 5 YEAR)
+                AND date <= (SELECT latest_date FROM MaxDate)
+                ORDER BY date ASC
+                """
+
             }
             
             if chart_id not in query_map:
                 return "해당 차트의 데이터가 준비중입니다."
-                
+            
+            # 쿼리 실행 및 데이터프레임 생성    
             df = pd.read_sql(query_map[chart_id], engine)
-            engine.dispose()
             
             if df.empty:
                 return "데이터가 없습니다."
+            
+            # 데이터 변화율 계산
+            if len(df) >= 2:
+                latest_value = df.iloc[0]  # 최신 값
+                previous_value = df.iloc[1]  # 직전 값
                 
+                # 수치형 컬럼 찾기 (TIME 제외)
+                numeric_cols = df.select_dtypes(include=['float64', 'int64']).columns
+                numeric_cols = [col for col in numeric_cols if col.upper() != 'TIME']
+                
+                if len(numeric_cols) > 0:
+                    main_col = numeric_cols[0]  # 주요 수치 컬럼
+                    change = latest_value[main_col] - previous_value[main_col]
+                    change_pct = (change / previous_value[main_col]) * 100 if previous_value[main_col] != 0 else 0
+                    
+                    return f"""
+                    현재 값: {latest_value[main_col]:.3f}
+                    이전 값: {previous_value[main_col]:.3f}
+                    변화량: {change:.3f}
+                    변화율: {change_pct:.2f}%
+                    측정 시점: {latest_value['TIME'] if 'TIME' in df.columns else 'N/A'}
+                    """
+            
             return df.to_string()
             
         except Exception as e:
             print(f"Error in get_chart_data: {str(e)}")
-            return "분석 준비중입니다."
+            return f"데이터 조회 중 오류 발생: {str(e)}"
+        finally:
+            engine.dispose()
         
     def generate_chart_insight(self, chart_id, chart_data):
         """차트별 인사이트 생성"""
